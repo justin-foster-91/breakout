@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Breakout</title>
+  <script src="//cdn.jsdelivr.net/npm/phaser@3.50.0/dist/phaser.min.js"></script>
+
+</head>
+<body>
+  <script type = "text/javascript" src="breakout.js" >
+  </script>
+
+<script>
+  var config = {
+    type: Phaser.AUTO,
+    width: 800,
+    height: 600,
+    physics: {
+        default: 'arcade'
+    },
+    scene: {
+        preload: preload,
+        create: create,
+        update: update
+    }
+  };
+
+  var game = new Phaser.Game(config);
+
+  let ball;
+  let ballVelocity = 0;
+  let bottomBorder;
+  let topBorder;
+  let leftBorder;
+  let rightBorder;
+  let bottomPaddle;
+  let paddleX;
+  let paddleDir;
+  let paddleVelocity = 300;
+  let gameScore = 0;
+  let wKey;
+  let aKey;
+  let dKey;
+  let gameLives;
+  let gameLivesText;
+  let gameOver = false;
+  let startState = true;
+  let aIsDown;
+  let dIsDown;
+  let wIsDown;
+
+  let level = [
+    ['*','*','*','*','*','*','*','*','*','*'],
+    [' ','*',' ','*',' ','*',' ','*',' ','*'],
+    ['*','*','*','*','*','*','*','*','*','*'],
+    [' ','*',' ','*',' ','*',' ','*',' ','*'],
+    ['*','*','*','*','*','*','*','*','*','*']
+  ]
+
+  function preload ()
+  {
+    this.load.image('eye', 'assets/lance-overdose-loader-eye.png');
+    this.load.image('ball', 'assets/58-Breakout-Tiles.png');
+    this.load.image('background', 'assets/1624.jpg');
+    this.load.image('paddle', 'assets/56-Breakout-Tiles.png');
+    this.load.image('brick1', 'assets/07-Breakout-Tiles.png');
+    this.load.audio('ballOnPaddle', 'sounds/pinging-noise.wav');
+    this.load.audio('ballOnBrick', 'sounds/brick-crack.wav');
+  }
+
+  function create ()
+  {
+    let background = this.add.sprite(0,0,'background').setScale(.45)
+    let paddleSound = this.sound.add('ballOnPaddle');
+    let brickSound = this.sound.add('ballOnBrick');
+
+    const makeWall = (rect) => {
+      this.physics.add.existing(rect, true)
+      this.physics.add.collider(rect, ball)
+      rect.visible = false;
+    }
+
+    const makePaddle = (rect) => {
+      this.physics.add.existing(rect, false)
+      this.physics.add.collider(ball, rect, function(x){
+        if (paddleDir === 'left'){
+          ball.body.setVelocity(-ballVelocity,-ballVelocity)
+        } else if (paddleDir === 'right'){
+          ball.body.setVelocity(ballVelocity,-ballVelocity)
+        }
+        paddleSound.play({volume: .3});
+      })
+      rect.body.immovable = true;
+      rect.body.setCollideWorldBounds(true);
+      rect.body.setFriction(0)
+    }
+
+    const makeBricks = (rect) => {
+      this.physics.add.existing(rect, false)
+      this.physics.add.collider(rect, ball, () => {
+        rect.destroy()
+        brickSound.play();
+      })
+      rect.body.immovable = true;
+      rect.body.onCollide = true;
+    }
+
+    ball = this.physics.add.sprite(400, 300, 'ball').setInteractive().setVelocity(0,ballVelocity).setBounce(1,1).setScale(.2);
+    topBorder = this.add.rectangle(this.cameras.main.centerX, 0, this.cameras.main.centerX * 2, 10, 0xFF0000)
+    leftBorder = this.add.rectangle(0, this.cameras.main.centerY, 10, this.cameras.main.centerX * 2, 0xFF0000)
+    rightBorder = this.add.rectangle(this.cameras.main.centerX * 2, this.cameras.main.centerY, 10, this.cameras.main.centerX * 2, 0xFF0000)
+
+    let walls = [topBorder, leftBorder, rightBorder]
+    walls.map(makeWall)
+
+    paddleX = this.cameras.main.centerX;
+    bottomPaddle = this.physics.add.sprite(this.cameras.main.centerX, 550, 'paddle').setScale(.15)
+    let paddles = [bottomPaddle]
+    paddles.map(makePaddle)
+
+    wKey = this.input.keyboard.addKey('W');
+    aKey = this.input.keyboard.addKey('A');
+    dKey = this.input.keyboard.addKey('D');
+
+
+    for (row=0; row<level.length; row++) {
+      for (col=0; col<level[row].length; col++) {
+        let brickWidth = ((this.cameras.main.centerX * 2) / level[row].length);
+        let brickHeight = 28;
+
+        let current = level[row][col];
+        if (current === '*'){
+          let brick = makeBricks(this.physics.add.sprite(((col * brickWidth) + brickWidth / 2), ((row * brickHeight) + brickHeight / 2) + 100, 'brick1').setScale(.2));
+        }
+      }
+    }
+
+    this.add.text((this.cameras.main.centerX * 2) - 100, (this.cameras.main.centerY * 2) - 50, `Score:   ${gameScore}`, { fontFamily: 'Georgia, "Goudy Bookletter 1911", Times, serif' }).setFontSize(20);
+
+    gameLives = 3;
+    gameLivesText = this.add.text((this.cameras.main.centerX * 2) - 100, (this.cameras.main.centerY * 2) - 100, `Lives:   ${gameLives}`, { fontFamily: 'Georgia, "Goudy Bookletter 1911", Times, serif' }).setFontSize(20);
+
+    document.addEventListener('keydown', (keyEvent) => {
+      if (keyEvent.key === 'a'){
+        aIsDown = true;
+      }
+      if (keyEvent.key === 'd'){
+        dIsDown = true;
+      }
+      if (keyEvent.key === 'w'){
+        wIsDown = true;
+      }
+    })
+    document.addEventListener('keyup', (keyEvent) => {
+      if (keyEvent.key === 'a'){
+        aIsDown = false;
+      }
+      if (keyEvent.key === 'd'){
+        dIsDown = false;
+      }
+      if (keyEvent.key === 'w'){
+        wIsDown = false;
+      }
+    })
+  }
+
+  function update() 
+  {
+    if (startState === true) {
+      ball.setPosition(bottomPaddle.x, bottomPaddle.y - 50)
+    }
+
+    if (ball.y > this.cameras.main.centerY * 2) {
+      console.log("Off screen");
+      gameLives-=1;
+      ball.setPosition(400, 300)
+      gameLivesText.setText(`Lives:   ${gameLives}`).setFontSize(20);
+      ballVelocity = 0;
+      ball.setVelocity(0,ballVelocity)
+      startState = true;
+    }
+
+    if (wIsDown) {
+      startState = false;
+      ballVelocity = 300;
+      ball.setVelocity(0,-ballVelocity)
+    }
+    if (aIsDown) {
+      movePaddle(bottomPaddle, 'left')
+    }
+    if (dIsDown) {
+      movePaddle(bottomPaddle, 'right')
+    }
+    if ((!aIsDown && !dIsDown) || (aIsDown && dIsDown)) {
+      movePaddle(bottomPaddle, 'stop')
+    }
+
+  }
+
+  function movePaddle(paddle, dir) {
+    paddleDir = dir;
+    if (dir === 'left') {
+      paddle.body.setVelocityX(-paddleVelocity)
+    } else if (dir === 'right') {
+      paddle.body.setVelocityX(paddleVelocity)
+    } else if (dir === 'stop') {
+      paddle.body.setVelocityX(0)
+    }
+  }
+
+
+  // TODO: 
+  // **Key input sticks and stops responding
+  // Different color bricks with different total hit counts
+  // Ball should be able to break two bricks at once
+
+</script>
+
+
+
+</body>
+</html>
