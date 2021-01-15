@@ -44,11 +44,12 @@
   let dKey;
   let gameLives;
   let gameLivesText;
-  let gameOver = false;
+  let gameRunning = true;
   let startState = true;
   let aIsDown;
   let dIsDown;
   let wIsDown;
+  let brickCount = 0;
 
   let level = [
     ['1','1','1','1','1','1','1','1','1','1'],
@@ -102,6 +103,7 @@
       this.physics.add.existing(rect, false)
       this.physics.add.collider(rect, ball, () => {
         if (hitCount === 1){
+          brickCount-=1;
           rect.destroy()
           brickSound.play();
         } else {
@@ -140,12 +142,15 @@
 
         let current = level[row][col];
         if (current === '1'){
+          brickCount+=1;
           let brick = makeBricks((this.physics.add.sprite(((col * brickWidth) + brickWidth / 2), ((row * brickHeight) + brickHeight / 2) + 100, 'brick1')).setScale(.2), 1);
         }
         if (current === '2'){
+          brickCount+=1;
           let brick = makeBricks((this.physics.add.sprite(((col * brickWidth) + brickWidth / 2), ((row * brickHeight) + brickHeight / 2) + 100, 'brick2')).setScale(.2), 2);
         }
         if (current === '3'){
+          brickCount+=1;
           let brick = makeBricks((this.physics.add.sprite(((col * brickWidth) + brickWidth / 2), ((row * brickHeight) + brickHeight / 2) + 100, 'brick3')).setScale(.2), 3);
         }
       }
@@ -182,6 +187,10 @@
 
   function update() 
   {
+    if (brickCount === 0){
+      gameOver('win')
+    }
+
     if (startState === true) {
       ball.setPosition(bottomPaddle.x, bottomPaddle.y - 50)
     }
@@ -189,6 +198,12 @@
     if (ball.y > this.cameras.main.centerY * 2) {
       console.log("Off screen");
       gameLives-=1;
+
+      if (gameLives === 0){
+        gameOver('loss')
+      }
+
+
       ball.setPosition(400, 300)
       gameLivesText.setText(`Lives:   ${gameLives}`).setFontSize(20);
       ballVelocity = 0;
@@ -224,9 +239,16 @@
     }
   }
 
+  function gameOver(status){
+    gameRunning = false;
+    console.log(`In gameOver --> ${status}`)
+  }
+
 
   // TODO: 
-  // **Key input sticks and stops responding
+  // Check if all bricks are gone, set win condition
+  // Check if lives are gone, set loss condition
+  // If won or lost, change scene
   // Different color bricks with different total hit counts
   // Ball should be able to break two bricks at once
 
