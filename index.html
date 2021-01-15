@@ -37,7 +37,7 @@
   let bottomPaddle;
   let paddleX;
   let paddleDir;
-  let paddleVelocity = 320;
+  let paddleVelocity = 350;
   let gameScore = 0;
   let wKey;
   let aKey;
@@ -50,6 +50,11 @@
   let dIsDown;
   let wIsDown;
   let brickCount = 0;
+  let brickArr = [];
+  let endText;
+  let paddleSound;
+  let background;
+  let brickSound;
 
   let level = [
     ['1','1','1','1','1','1','1','1','1','1'],
@@ -74,9 +79,9 @@
 
   function create ()
   {
-    let background = this.add.sprite(0,0,'background').setScale(.45)
-    let paddleSound = this.sound.add('ballOnPaddle');
-    let brickSound = this.sound.add('ballOnBrick');
+    background = this.add.sprite(0,0,'background').setScale(.45)
+    paddleSound = this.sound.add('ballOnPaddle');
+    brickSound = this.sound.add('ballOnBrick');
 
     const makeWall = (rect) => {
       this.physics.add.existing(rect, true)
@@ -86,14 +91,7 @@
 
     const makePaddle = (rect) => {
       this.physics.add.existing(rect, false)
-      this.physics.add.collider(ball, rect, function(x){
-        if (paddleDir === 'left'){
-          ball.body.setVelocity(-ballVelocity,-ballVelocity)
-        } else if (paddleDir === 'right'){
-          ball.body.setVelocity(ballVelocity,-ballVelocity)
-        }
-        paddleSound.play({volume: .3});
-      })
+      this.physics.add.collider(ball, rect, function(x){moveBall()})
       rect.body.immovable = true;
       rect.body.setCollideWorldBounds(true);
       rect.body.setFriction(0)
@@ -108,6 +106,7 @@
           brickSound.play();
         } else {
           hitCount-=1;
+          rect.setTexture(`brick${hitCount}`);
           // rect = makeBricks((this.physics.add.sprite(((col * brickWidth) + brickWidth / 2), ((row * brickHeight) + brickHeight / 2) + 100, `brick${hitCount}`)).setScale(.2), hitCount)
           brickSound.play();
         }
@@ -115,6 +114,7 @@
       })
       rect.body.immovable = true;
       rect.body.onCollide = true;
+      brickArr.push(rect)
     }
 
     ball = this.physics.add.sprite(400, 300, 'ball').setInteractive().setVelocity(0,ballVelocity).setBounce(1,1).setScale(.2);
@@ -143,15 +143,15 @@
         let current = level[row][col];
         if (current === '1'){
           brickCount+=1;
-          let brick = makeBricks((this.physics.add.sprite(((col * brickWidth) + brickWidth / 2), ((row * brickHeight) + brickHeight / 2) + 100, 'brick1')).setScale(.2), 1);
+          makeBricks((this.physics.add.sprite(((col * brickWidth) + brickWidth / 2), ((row * brickHeight) + brickHeight / 2) + 100, 'brick1')).setScale(.2), 1);
         }
         if (current === '2'){
           brickCount+=1;
-          let brick = makeBricks((this.physics.add.sprite(((col * brickWidth) + brickWidth / 2), ((row * brickHeight) + brickHeight / 2) + 100, 'brick2')).setScale(.2), 2);
+          makeBricks((this.physics.add.sprite(((col * brickWidth) + brickWidth / 2), ((row * brickHeight) + brickHeight / 2) + 100, 'brick2')).setScale(.2), 2);
         }
         if (current === '3'){
           brickCount+=1;
-          let brick = makeBricks((this.physics.add.sprite(((col * brickWidth) + brickWidth / 2), ((row * brickHeight) + brickHeight / 2) + 100, 'brick3')).setScale(.2), 3);
+          makeBricks((this.physics.add.sprite(((col * brickWidth) + brickWidth / 2), ((row * brickHeight) + brickHeight / 2) + 100, 'brick3')).setScale(.2), 3);
         }
       }
     }
@@ -183,6 +183,10 @@
         wIsDown = false;
       }
     })
+
+    endText = this.add.text(this.cameras.main.centerX , this.cameras.main.centerY, ``, { fontFamily: 'Georgia, "Goudy Bookletter 1911", Times, serif' }).setFontSize(50)
+    endText.visible = false;
+  
   }
 
   function update() 
@@ -192,6 +196,7 @@
     }
 
     if (startState === true) {
+      ball.visible = true;
       ball.setPosition(bottomPaddle.x, bottomPaddle.y - 50)
     }
 
@@ -203,7 +208,7 @@
         gameOver('loss')
       }
 
-
+      ball.visible = false;
       ball.setPosition(400, 300)
       gameLivesText.setText(`Lives:   ${gameLives}`).setFontSize(20);
       ballVelocity = 0;
@@ -211,10 +216,11 @@
       startState = true;
     }
 
-    if (wIsDown) {
+    if (startState === true && wIsDown) {
       startState = false;
       ballVelocity = 300;
-      ball.setVelocity(0,-ballVelocity)
+      // ball.setVelocity(0,-ballVelocity)
+      moveBall()
     }
     if (aIsDown) {
       movePaddle(bottomPaddle, 'left')
@@ -239,18 +245,38 @@
     }
   }
 
+  function moveBall(){
+    console.log(paddleDir);
+    if (paddleDir === 'left'){
+      ball.body.setVelocity(-ballVelocity,-ballVelocity)
+    } else if (paddleDir === 'right'){
+      ball.body.setVelocity(ballVelocity,-ballVelocity)
+    } else if (paddleDir === 'stop'){
+      ball.body.setVelocity(0,-ballVelocity)
+    }
+    paddleSound.play({volume: .3});
+  }
+
   function gameOver(status){
     gameRunning = false;
-    console.log(`In gameOver --> ${status}`)
+    ball.visible = false;
+    brickArr.map(brick => brick.visible = false);
+    if (status === 'win'){
+      endText.visible = true;
+      endText.setText('You won!')
+    }
+    if (status === 'loss'){
+      endText.visible = true;
+      endText.setText('You lost!')
+    }
+    // console.log(`In gameOver --> ${status}`)
   }
 
 
   // TODO: 
-  // Check if all bricks are gone, set win condition
-  // Check if lives are gone, set loss condition
-  // If won or lost, change scene
-  // Different color bricks with different total hit counts
   // Ball should be able to break two bricks at once
+  // If paddle is moving when ball is launched, shoot it that direction
+  // Position endText based on width and height
 
 </script>
 
