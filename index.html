@@ -55,6 +55,9 @@
   let paddleSound;
   let background;
   let brickSound;
+  let powers = [];
+  let activePowers = [];
+  let preStart = true;
 
   let level = [
     ['1','1','1','1','1','1','1','1','1','1'],
@@ -75,6 +78,7 @@
     this.load.image('brick3', 'assets/01-Breakout-Tiles.png');
     this.load.audio('ballOnPaddle', 'sounds/pinging-noise.wav');
     this.load.audio('ballOnBrick', 'sounds/brick-crack.wav');
+    this.load.audio('powerUp', 'sounds/power-up.wav');
   }
 
   function create ()
@@ -82,19 +86,23 @@
     background = this.add.sprite(0,0,'background').setScale(.45)
     paddleSound = this.sound.add('ballOnPaddle');
     brickSound = this.sound.add('ballOnBrick');
+    powerUpSound = this.sound.add('powerUp');
 
-    const makeWall = (rect) => {
-      this.physics.add.existing(rect, true)
-      this.physics.add.collider(rect, ball)
-      rect.visible = false;
+    const makeWall = (wall) => {
+      this.physics.add.existing(wall, true)
+      this.physics.add.collider(wall, ball)
+      wall.visible = false;
     }
 
-    const makePaddle = (rect) => {
-      this.physics.add.existing(rect, false)
-      this.physics.add.collider(ball, rect, function(x){moveBall()})
-      rect.body.immovable = true;
-      rect.body.setCollideWorldBounds(true);
-      rect.body.setFriction(0)
+    const makePaddle = (paddle) => {
+      this.physics.add.existing(paddle, false)
+      this.physics.add.collider(ball, paddle, function(x){
+        moveBall()
+        paddleSound.play({volume: .3});
+      })
+      paddle.body.immovable = true;
+      paddle.body.setCollideWorldBounds(true);
+      paddle.body.setFriction(0)
     }
 
     const makeBricks = (rect, hitCount) => {
@@ -103,11 +111,13 @@
         if (hitCount === 1){
           brickCount-=1;
           rect.destroy()
+          
+          brickBreak(rect, this.physics, makePowers);
+
           brickSound.play();
         } else {
           hitCount-=1;
           rect.setTexture(`brick${hitCount}`);
-          // rect = makeBricks((this.physics.add.sprite(((col * brickWidth) + brickWidth / 2), ((row * brickHeight) + brickHeight / 2) + 100, `brick${hitCount}`)).setScale(.2), hitCount)
           brickSound.play();
         }
 
@@ -115,6 +125,15 @@
       rect.body.immovable = true;
       rect.body.onCollide = true;
       brickArr.push(rect)
+    }
+
+    const makePowers = (power) => {
+      this.physics.add.existing(power, true)
+      this.physics.add.collider(power, bottomPaddle, () => {
+        activePowers.push(power)
+        power.destroy()
+        powerUpSound.play({volume: .3});
+      })
     }
 
     ball = this.physics.add.sprite(400, 300, 'ball').setInteractive().setVelocity(0,ballVelocity).setBounce(1,1).setScale(.2);
@@ -126,7 +145,7 @@
     walls.map(makeWall)
 
     paddleX = this.cameras.main.centerX;
-    bottomPaddle = this.physics.add.sprite(this.cameras.main.centerX, 550, 'paddle').setScale(.15)
+    bottomPaddle = this.physics.add.sprite(this.cameras.main.centerX, 550, 'paddle').setInteractive().setScale(.15)
     let paddles = [bottomPaddle]
     paddles.map(makePaddle)
 
@@ -184,54 +203,73 @@
       }
     })
 
-    endText = this.add.text(this.cameras.main.centerX , this.cameras.main.centerY, ``, { fontFamily: 'Georgia, "Goudy Bookletter 1911", Times, serif' }).setFontSize(50)
+    endText = this.add.text(this.cameras.main.centerX -100, this.cameras.main.centerY -100, ``, { fontFamily: 'Georgia, "Goudy Bookletter 1911", Times, serif' }).setFontSize(50)
     endText.visible = false;
   
+
   }
 
   function update() 
   {
-    if (brickCount === 0){
-      gameOver('win')
-    }
-
-    if (startState === true) {
-      ball.visible = true;
-      ball.setPosition(bottomPaddle.x, bottomPaddle.y - 50)
-    }
-
-    if (ball.y > this.cameras.main.centerY * 2) {
-      console.log("Off screen");
-      gameLives-=1;
-
-      if (gameLives === 0){
-        gameOver('loss')
+    if (preStart){
+      endText.setText("Use W to launch. \n A and D to move left to right. \n Press A or D to start the game.");
+      endText.visible = true;
+      if (aIsDown || dIsDown){
+        preStart = false;
+        endText.visible = false;
+      }
+    } else {
+      if (brickCount === 0){
+        gameOver('win')
       }
 
-      ball.visible = false;
-      ball.setPosition(400, 300)
-      gameLivesText.setText(`Lives:   ${gameLives}`).setFontSize(20);
-      ballVelocity = 0;
-      ball.setVelocity(0,ballVelocity)
-      startState = true;
-    }
+      if (startState === true) {
+        ball.visible = true;
+        ball.setPosition(bottomPaddle.x, bottomPaddle.y - 50)
+      }
 
-    if (startState === true && wIsDown) {
-      startState = false;
-      ballVelocity = 300;
-      // ball.setVelocity(0,-ballVelocity)
-      moveBall()
-    }
-    if (aIsDown) {
-      movePaddle(bottomPaddle, 'left')
-    }
-    if (dIsDown) {
-      movePaddle(bottomPaddle, 'right')
-    }
-    if ((!aIsDown && !dIsDown) || (aIsDown && dIsDown)) {
-      movePaddle(bottomPaddle, 'stop')
-    }
+      if (ball.y > this.cameras.main.centerY * 2) {
+        console.log("Off screen");
+        gameLives-=1;
 
+        if (gameLives === 0){
+          gameOver('loss')
+        }
+
+        ball.visible = false;
+        ball.setPosition(400, 300)
+        gameLivesText.setText(`Lives:   ${gameLives}`).setFontSize(20);
+        ballVelocity = 0;
+        ball.setVelocity(0,ballVelocity)
+        startState = true;
+      }
+
+      if (startState === true && wIsDown) {
+        startState = false;
+        ballVelocity = 300;
+        // ball.setVelocity(0,-ballVelocity)
+        moveBall()
+      }
+      if (aIsDown) {
+        movePaddle(bottomPaddle, 'left')
+      }
+      if (dIsDown) {
+        movePaddle(bottomPaddle, 'right')
+      }
+      if ((!aIsDown && !dIsDown) || (aIsDown && dIsDown)) {
+        movePaddle(bottomPaddle, 'stop')
+      }
+
+      powers = powers.map(power => {
+        if (power.y > this.cameras.main.centerY * 2){
+          power.destroy()
+          return undefined;
+        }
+        return power;
+      }).filter(x => x)
+
+      applyActivePowers();
+    }
   }
 
   function movePaddle(paddle, dir) {
@@ -254,7 +292,27 @@
     } else if (paddleDir === 'stop'){
       ball.body.setVelocity(0,-ballVelocity)
     }
-    paddleSound.play({volume: .3});
+  }
+
+  function brickBreak(brick, physics, makePowers){
+    let drop = physics.add.sprite(brick.x, brick.y, 'eye').setInteractive().setVelocity(0,100).setScale(.15)
+    drop.modifiers = {ballUp: true, time: 200};
+    makePowers(drop);
+    powers.push(drop)
+    // console.log(powers);
+  }
+
+  function applyActivePowers(){
+    if (haveBallUpPower()) {
+      if (wIsDown) {
+        ballVelocity = 300;
+        moveBall()
+      }
+    }
+  }
+
+  function haveBallUpPower(){
+    return activePowers.some(power => power.modifiers.ballUp)
   }
 
   function gameOver(status){
@@ -274,9 +332,13 @@
 
 
   // TODO: 
+  // Splash screen on start with movement instructions
+  // Power should only be random chance
   // Ball should be able to break two bricks at once
-  // If paddle is moving when ball is launched, shoot it that direction
-  // Position endText based on width and height
+
+  // Store current time in ballUp object & length it should last
+  // Check in time is past stored current time + duration
+  // Attach particle effects to ball
 
 </script>
 
