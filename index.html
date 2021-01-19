@@ -37,7 +37,7 @@
   let bottomPaddle;
   let paddleX;
   let paddleDir;
-  let paddleVelocity = 350;
+  let paddleVelocity = 400;
   let gameScore = 0;
   let wKey;
   let aKey;
@@ -58,6 +58,8 @@
   let powers = [];
   let activePowers = [];
   let preStart = true;
+  let powerUpSound;
+  let powerDownSound;
 
   let level = [
     ['1','1','1','1','1','1','1','1','1','1'],
@@ -76,9 +78,11 @@
     this.load.image('brick1', 'assets/07-Breakout-Tiles.png');
     this.load.image('brick2', 'assets/03-Breakout-Tiles.png');
     this.load.image('brick3', 'assets/01-Breakout-Tiles.png');
+    this.load.image('ballUpPower', 'assets/45-Breakout-Tiles.png');
     this.load.audio('ballOnPaddle', 'sounds/pinging-noise.wav');
     this.load.audio('ballOnBrick', 'sounds/brick-crack.wav');
     this.load.audio('powerUp', 'sounds/power-up.wav');
+    this.load.audio('powerDown', 'sounds/power-down.wav');
   }
 
   function create ()
@@ -87,6 +91,7 @@
     paddleSound = this.sound.add('ballOnPaddle');
     brickSound = this.sound.add('ballOnBrick');
     powerUpSound = this.sound.add('powerUp');
+    powerDownSound = this.sound.add('powerDown');
 
     const makeWall = (wall) => {
       this.physics.add.existing(wall, true)
@@ -131,6 +136,7 @@
       this.physics.add.existing(power, true)
       this.physics.add.collider(power, bottomPaddle, () => {
         activePowers.push(power)
+        power.modifiers.activatedTime = Math.floor( new Date().getTime() )
         power.destroy()
         powerUpSound.play({volume: .3});
       })
@@ -203,7 +209,10 @@
       }
     })
 
-    endText = this.add.text(this.cameras.main.centerX -100, this.cameras.main.centerY -100, ``, { fontFamily: 'Georgia, "Goudy Bookletter 1911", Times, serif' }).setFontSize(50)
+    endText = this.add.text(this.cameras.main.centerX -350, this.cameras.main.centerY -50, ``, { fontFamily: 'Georgia, "Goudy Bookletter 1911", Times, serif' })
+      .setFontSize(50)
+      .setAlign('center')
+      .setBackgroundColor('black')
     endText.visible = false;
   
 
@@ -213,6 +222,7 @@
   {
     if (preStart){
       endText.setText("Use W to launch. \n A and D to move left to right. \n Press A or D to start the game.");
+      // gameTitle.setPosition(this.cameras.main.centerX - gameTitle.width /2 , 0)
       endText.visible = true;
       if (aIsDown || dIsDown){
         preStart = false;
@@ -229,8 +239,11 @@
       }
 
       if (ball.y > this.cameras.main.centerY * 2) {
-        console.log("Off screen");
         gameLives-=1;
+        activePowers = [];
+
+        powers.map(power => power.destroy())
+        powers = [];
 
         if (gameLives === 0){
           gameOver('loss')
@@ -268,6 +281,18 @@
         return power;
       }).filter(x => x)
 
+      activePowers = activePowers.map(power => {
+        nowTime = new Date().getTime();
+        let { activatedTime, timeToLive } = power.modifiers;
+        // FIXME: Power not activating
+        if ((activatedTime + timeToLive) >= nowTime){
+          return power;
+        } else{
+          powerDownSound.play();
+          return undefined;
+        }
+      }).filter(x => x)
+      
       applyActivePowers();
     }
   }
@@ -284,7 +309,6 @@
   }
 
   function moveBall(){
-    console.log(paddleDir);
     if (paddleDir === 'left'){
       ball.body.setVelocity(-ballVelocity,-ballVelocity)
     } else if (paddleDir === 'right'){
@@ -295,19 +319,23 @@
   }
 
   function brickBreak(brick, physics, makePowers){
-    let drop = physics.add.sprite(brick.x, brick.y, 'eye').setInteractive().setVelocity(0,100).setScale(.15)
-    drop.modifiers = {ballUp: true, time: 200};
-    makePowers(drop);
-    powers.push(drop)
-    // console.log(powers);
+    if ((Math.floor(Math.random() * 2)) === 1){
+      let drop = physics.add.sprite(brick.x, brick.y, 'eye').setInteractive().setVelocity(0,100).setScale(.15)
+      drop.modifiers = {ballUp: true, timeToLive: 5000};
+      makePowers(drop);
+      powers.push(drop)
+    }
   }
 
   function applyActivePowers(){
     if (haveBallUpPower()) {
+      bottomPaddle.setTexture('ballUpPower')
       if (wIsDown) {
         ballVelocity = 300;
         moveBall()
       }
+    } else{
+      bottomPaddle.setTexture('paddle')
     }
   }
 
@@ -327,18 +355,17 @@
       endText.visible = true;
       endText.setText('You lost!')
     }
-    // console.log(`In gameOver --> ${status}`)
   }
 
 
   // TODO: 
-  // Splash screen on start with movement instructions
-  // Power should only be random chance
   // Ball should be able to break two bricks at once
 
-  // Store current time in ballUp object & length it should last
-  // Check in time is past stored current time + duration
-  // Attach particle effects to ball
+  // Centering instructions throws off ending message.
+  // Replace instructions with WASD graphic
+
+  // Make more levels
+  // Add another power
 
 </script>
 
